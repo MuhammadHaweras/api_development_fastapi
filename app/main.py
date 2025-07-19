@@ -3,8 +3,34 @@ from typing import Optional
 from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel
+import time
+
+import mysql.connector
 
 app = FastAPI()
+
+while True:
+    try: 
+        conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="root",
+        database="fastapi"
+        )
+        cursor = conn.cursor()
+        print("Success")
+        
+        # cursor.execute("SELECT * FROM products")
+
+        # rows = cursor.fetchall()
+        # for row in rows:
+        #     print(row)
+        # cursor.close()
+        break;
+    except Exception as error:
+        print(f"Error= {error}")
+        time.sleep(3);
+
 
 class Post(BaseModel):
     title: str
@@ -75,8 +101,7 @@ def update_post(id: int, post: Post):
      post_1 = get_single_post(id)
      if not post_1:
        raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail= f"post with id: {id} not found")
-     updated_post= post.dict()
+     updated_post = post.dict()
      post_1["title"] = updated_post['title']
      post_1["content"] = updated_post['content']
      return post_1
-    
