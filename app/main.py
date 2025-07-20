@@ -1,36 +1,31 @@
-from random import randrange
-from typing import Optional
 from fastapi import FastAPI, Response, status, HTTPException
-from fastapi.params import Body
 from pydantic import BaseModel
+from typing import Optional
+import pymysql
+from pymysql.cursors import DictCursor
 import time
-
-import mysql.connector
 
 app = FastAPI()
 
+# -------------------- Database Connection --------------------
+
 while True:
-    try: 
-        conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="root",
-        database="fastapi"
+    try:
+        conn = pymysql.connect(
+            host="localhost",
+            user="root",
+            password="root",
+            database="fastapi",
+            cursorclass=DictCursor
         )
         cursor = conn.cursor()
-        print("Success")
-        
-        # cursor.execute("SELECT * FROM products")
+        print("✅ Connected to MySQL")
+        break
+    except Exception as e:
+        print("❌ Error connecting to DB:", e)
+        time.sleep(3)
 
-        # rows = cursor.fetchall()
-        # for row in rows:
-        #     print(row)
-        # cursor.close()
-        break;
-    except Exception as error:
-        print(f"Error= {error}")
-        time.sleep(3);
-
+# -------------------- Pydantic Schema --------------------
 
 class Post(BaseModel):
     title: str
@@ -38,70 +33,68 @@ class Post(BaseModel):
     published: bool = True
     rating: Optional[int] = None
 
-my_posts = [
-    {"id": 1, "title": "Title of post 1", "content": "Content of post 1", "published": True},
-    {"id": 2, "title": "Title of post 1", "content": "Content of post 1", "published": True}
-  ]
+# -------------------- Helper Functions --------------------
 
-def get_single_post(id):
-    for p in my_posts:
-        if p["id"] == id :
-            return p
+def get_post_by_id(post_id: int):
+    cursor.execute("SELECT * FROM posts WHERE id = %s", (post_id,))
+    return cursor.fetchone()
+
+# -------------------- Routes --------------------
 
 @app.get("/")
-
 async def root():
     return {"message": "Hello, World!!!!!!"}
 
-# get all posts
+# Get all posts
 @app.get("/posts")
-
 def get_posts():
-    return my_posts
+    cursor.execute("SELECT * FROM posts")
+    return cursor.fetchall()
 
+# Create new post
 @app.post("/posts", status_code=status.HTTP_201_CREATED)
+def create_post(new_post: Post):
+    cursor.execute(
+        "INSERT INTO posts (title, content, published) VALUES (%s, %s, %s)",
+        (new_post.title, new_post.content, new_post.published)
+    )
+    conn.commit()
+    post_id = cursor.lastrowid
+    return get_post_by_id(post_id)
 
-# creare a post
-def create_posts(new_post: Post):
-    post = new_post.dict()
-    post["id"] = randrange(1, 1000000)
-    my_posts.append(post)
+# Get single post by ID
+@app.get("/posts/{id}")
+def get_post(id: int):
+    post = get_post_by_id(id)
+    if not post:
+        raise HTTPException(status_code=404, detail=f"Post with id {id} not found")
     return post
 
-#get post
-
-@app.get("/posts/{id}")
-
-def get_post(id: int):
-   post = get_single_post(id)
-   if not post:
-       raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail= f"post with id: {id} not found")
-   return post
-
-# Delete Request
-
-@app.delete("/posts/{id}",status_code= status.HTTP_204_NO_CONTENT)
-
+# Delete a post
+@app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id: int):
-    idx = 0
-    for p in my_posts:
-        if p["id"] == id:
-            idx = p["id"]
-    
-    my_posts.pop(idx)
-    if not idx:
-         raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail= f"post with id: {id} not found")
+    post = get_post_by_id(id)
+    if not post:
+        raise HTTPException(status_code=404, detail=f"Post with id {id} not found")
 
-    return Response(status_code= status.HTTP_204_NO_CONTENT)
+    cursor.execute("DELETE FROM posts WHERE id = %s", (id,))
+    conn.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-#update
+# Update a post
 @app.put("/posts/{id}")
+def update_post(id: int, updated_post: Post):
+    post = get_post_by_id(id)
+    if not post:
+        raise HTTPException(status_code=404, detail=f"Post with id {id} not found")
 
-def update_post(id: int, post: Post):
-     post_1 = get_single_post(id)
-     if not post_1:
-       raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail= f"post with id: {id} not found")
-     updated_post = post.dict()
-     post_1["title"] = updated_post['title']
-     post_1["content"] = updated_post['content']
-     return post_1
+    cursor.execute(
+        """
+        UPDATE posts
+        SET title = %s, content = %s, published = %s
+        WHERE id = %s
+        """,
+        (updated_post.title, updated_post.content, updated_post.published, id)
+    )
+    conn.commit()
+    return get_post_by_id(id)
