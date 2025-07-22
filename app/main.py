@@ -2,7 +2,7 @@ from fastapi import FastAPI, Response, status, HTTPException, Depends
 from typing import List
 import pymysql
 from pymysql.cursors import DictCursor
-from . import models, schemas
+from . import models, schemas, utils
 import time
 
 from .database import engine, get_db
@@ -83,3 +83,17 @@ def update_post(id: int, updated_post: schemas.PostCreate, db: Session = Depends
     db.commit()
 
     return post.first()
+
+# create a new user
+@app.post("/users", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
+
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    user.password = utils.hash_password(user.password)
+
+    new_user = models.User(**user.dict())
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return new_user
