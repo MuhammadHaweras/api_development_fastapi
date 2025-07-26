@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from . import models
 
 from .database import engine
@@ -10,7 +11,7 @@ from .config import settings
 app = FastAPI()
 
 app.add_middleware(
-    "CORSMiddleware",
+    CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
