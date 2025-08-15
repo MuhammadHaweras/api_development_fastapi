@@ -5,7 +5,6 @@ A modern, secure, and fully asynchronous REST API built with **FastAPI**, featur
 - 👍 Voting system (Vote/Unvote)
 - 🔎 Post search functionality
 - 🧾 SQLAlchemy ORM + Alembic migrations
-- 🚀 Deployed on Heroku (https://fastapi-haweras-03d9d508f039.herokuapp.com/)
 
 ---
 
